@@ -9,11 +9,11 @@ public class AppRunner {
 
     private final UniversalArray<Product> products = new UniversalArrayImpl<>();
 
-    private final CoinAcceptor coinAcceptor;
-
     private static boolean isExit = false;
+    private final MoneyReceiver moneyReceiver;
 
-    private AppRunner() {
+    private AppRunner(MoneyReceiver moneyReceiver) {
+        this.moneyReceiver = moneyReceiver;
         products.addAll(new Product[]{
                 new Water(ActionLetter.B, 20),
                 new CocaCola(ActionLetter.C, 50),
@@ -22,32 +22,51 @@ public class AppRunner {
                 new Mars(ActionLetter.F, 80),
                 new Pistachios(ActionLetter.G, 130)
         });
-        coinAcceptor = new CoinAcceptor(100);
     }
 
-    public static void run() {
-        AppRunner app = new AppRunner();
+    public static void run(MoneyReceiver moneyReceiver) {
+        AppRunner app = new AppRunner(moneyReceiver);
         while (!isExit) {
             app.startSimulation();
         }
     }
 
     private void startSimulation() {
-        print("В автомате доступны:");
-        showProducts(products);
+        print("Главное меню:");
+        print("1 = Показать доступные товары");
+        print("2 = Пополнить ваш баланс");
+        print("3 = Пополнить картой баланс");
+        print("h = Выйти");
 
-        print("Монет на сумму: " + coinAcceptor.getAmount());
+        String choice = fromConsole().substring(0, 1);
 
-        UniversalArray<Product> allowProducts = new UniversalArrayImpl<>();
-        allowProducts.addAll(getAllowedProducts().toArray());
-        chooseAction(allowProducts);
-
+        switch (choice) {
+            case "1":
+                print("В автомате доступны:");
+                showProducts(products);
+                print("Монет на сумму: " + moneyReceiver.getBalance());
+                UniversalArray<Product> allowProducts = new UniversalArrayImpl<>();
+                allowProducts.addAll(getAllowedProducts().toArray());
+                chooseAction(allowProducts);
+                break;
+            case "2":
+                topBalance();
+                break;
+            case "3":
+                topBalanceWithCard();
+                break;
+            case "h":
+                isExit = true;
+                break;
+            default:
+                print("Неправильная команда. Попробуйте заново!");
+        }
     }
 
     private UniversalArray<Product> getAllowedProducts() {
         UniversalArray<Product> allowProducts = new UniversalArrayImpl<>();
         for (int i = 0; i < products.size(); i++) {
-            if (coinAcceptor.getAmount() >= products.get(i).getPrice()) {
+            if (moneyReceiver.getBalance() >= products.get(i).getPrice()) {
                 allowProducts.add(products.get(i));
             }
         }
@@ -55,33 +74,26 @@ public class AppRunner {
     }
 
     private void chooseAction(UniversalArray<Product> products) {
-        print(" a - Пополнить баланс");
         showActions(products);
         print(" h - Выйти");
         String action = fromConsole().substring(0, 1);
-        if ("a".equalsIgnoreCase(action)) {
-            coinAcceptor.setAmount(coinAcceptor.getAmount() + 10);
-            print("Вы пополнили баланс на 10");
-            return;
-        }
         try {
+            if ("h".equalsIgnoreCase(action)) {
+                return;
+            }
+
             for (int i = 0; i < products.size(); i++) {
                 if (products.get(i).getActionLetter().equals(ActionLetter.valueOf(action.toUpperCase()))) {
-                    coinAcceptor.setAmount(coinAcceptor.getAmount() - products.get(i).getPrice());
-                    print("Вы купили " + products.get(i).getName());
+                    if (moneyReceiver.doPurchasing(products.get(i).getPrice())) {
+                        print("Вы купили " + products.get(i).getName());
+                    }
                     break;
                 }
             }
         } catch (IllegalArgumentException e) {
-            if ("h".equalsIgnoreCase(action)) {
-                isExit = true;
-            } else {
-                print("Недопустимая буква. Попрбуйте еще раз.");
-                chooseAction(products);
-            }
+            print("Недопустимая буква. Попрбуйте еще раз.");
+            chooseAction(products);
         }
-
-
     }
 
     private void showActions(UniversalArray<Product> products) {
@@ -103,4 +115,54 @@ public class AppRunner {
     private void print(String msg) {
         System.out.println(msg);
     }
+
+    private void topBalance() {
+        print("Введите сумму для пополнения вашего баланса:");
+        try {
+            int amountToAdd = Integer.parseInt(fromConsole());
+            if (amountToAdd > 0) {
+                moneyReceiver.insertMoney(amountToAdd);
+                print("Баланс успешно пополнен Ваш баланс: " + moneyReceiver.getBalance());
+            } else {
+                print("Вы ввели некорректное число для пополнения баланса (отрицтальное)");
+            }
+        } catch (NumberFormatException e) {
+            print("Недопустимый ввод! Введите число для пополнения баланса.");
+        }
+    }
+
+
+    private void topBalanceWithCard() {
+        print("Введите номер карты:");
+        String str1 = fromConsole();
+        int cardNumber = Integer.parseInt(str1);
+        print("Введите пин-код карты:");
+        String str2 = fromConsole();
+        int pinCode = Integer.parseInt(str2);
+        int oldNumber = 12345;
+        int oldpincode = 111;
+
+        // здесь можно будет добавить реализацию с проверкой на правильной номера
+        // с помощью хиширования, или другими способами. Я сделаю просто с переменными,
+        // дам им название и буду просто сравнивать
+
+        print("Введите сумму для пополнения карты:");
+        try {
+            int amountToAdd = Integer.parseInt(fromConsole());
+            if (cardNumber == oldNumber && pinCode == oldpincode) {
+                if (amountToAdd > 0) {
+                    moneyReceiver.insertMoney(amountToAdd);
+                    print("Баланс карты успешно пополнен. Ваш баланс: " + moneyReceiver.getBalance());
+                } else {
+                    print("Вы ввели некорректное число для пополнения баланса (отрицательное).");
+                }
+            } else {
+                print("Вы невверно ввели номер или пинкод вашей карты");
+            }
+        } catch (NumberFormatException e) {
+            print("Недопустимый ввод! Введите число для пополнения баланса.");
+        }
+    }
 }
+
+
